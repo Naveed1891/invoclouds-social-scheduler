@@ -1,0 +1,36 @@
+name: Publish daily social post
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publish next post
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          PUBLIC_BASE_URL: https://${{ github.repository_owner }}.github.io/invoclouds-social-scheduler
+        run: python publish.py
+
+      - name: Save publishing status
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add posts.csv
+          git diff --cached --quiet || git commit -m "Update published social posts"
+          git push
