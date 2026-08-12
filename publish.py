@@ -296,7 +296,12 @@ def verify_public_image(image_url: str) -> None:
         )
 
 
-def create_buffer_post(channel_id: str, caption: str, image_url: str) -> str:
+def create_buffer_post(
+    channel_id: str,
+    service: str,
+    caption: str,
+    image_url: str,
+) -> str:
     post_input = {
         "text": caption,
         "channelId": channel_id,
@@ -304,6 +309,20 @@ def create_buffer_post(channel_id: str, caption: str, image_url: str) -> str:
         "mode": "addToQueue",
         "assets": [{"image": {"url": image_url}}],
     }
+
+    # Buffer requires an explicit post type for Instagram and Facebook.
+    # Instagram also requires shouldShareToFeed for a normal feed post.
+    if service == "instagram":
+        post_input["metadata"] = {
+            "instagram": {
+                "type": "post",
+                "shouldShareToFeed": True,
+            }
+        }
+    elif service == "facebook":
+        post_input["metadata"] = {"facebook": {"type": "post"}}
+    else:
+        raise PublishError(f"Unsupported Buffer service: {service}")
     data = graphql_request(
         """
         mutation CreatePost($input: CreatePostInput!) {
@@ -360,7 +379,9 @@ def main() -> int:
         if not caption:
             raise PublishError("The Instagram caption is empty for the selected row.")
         print(f"Adding to Instagram queue: {instagram.get('displayName') or instagram.get('name')}")
-        row["instagram_post_id"] = create_buffer_post(instagram["id"], caption, image_url)
+        row["instagram_post_id"] = create_buffer_post(
+            instagram["id"], "instagram", caption, image_url
+        )
         write_posts(fieldnames, rows)
     else:
         print("Instagram is already recorded for this row; skipping it.")
@@ -370,7 +391,9 @@ def main() -> int:
         if not caption:
             raise PublishError("The Facebook caption is empty for the selected row.")
         print(f"Adding to Facebook queue: {facebook.get('displayName') or facebook.get('name')}")
-        row["facebook_post_id"] = create_buffer_post(facebook["id"], caption, image_url)
+        row["facebook_post_id"] = create_buffer_post(
+            facebook["id"], "facebook", caption, image_url
+        )
         write_posts(fieldnames, rows)
     else:
         print("Facebook is already recorded for this row; skipping it.")
